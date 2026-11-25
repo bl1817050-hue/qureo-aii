@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#14213d">
+<title>QUREO AI – مساعد المذاكرة</title>
+<link rel="manifest" href="manifest.json">
+<style>
+:root{--bg:#0b1220;--card:#151f33;--muted:#aab6cc;--accent:#62d6b5;--white:#f5f7fb}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(160deg,#0b1220,#172743);color:var(--white);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;min-height:100vh}
+main{max-width:720px;margin:auto;padding:22px 16px 40px}
+header{padding:12px 2px 18px}h1{margin:0 0 6px;font-size:28px}header p,.hint{color:var(--muted);line-height:1.7}
+.card{background:var(--card);border:1px solid #2a3853;border-radius:18px;padding:16px;margin:14px 0;box-shadow:0 10px 30px #0003}
+label{display:block;margin:8px 0;font-weight:650}
+textarea{width:100%;min-height:140px;background:#0d1729;color:var(--white);border:1px solid #3a4a67;border-radius:12px;padding:12px;font:inherit;resize:vertical}
+input[type=file]{width:100%;padding:12px;background:#0d1729;border:1px dashed #526482;border-radius:12px;color:var(--muted)}
+button{border:0;border-radius:12px;padding:12px 16px;font:inherit;font-weight:700;cursor:pointer;background:var(--accent);color:#08251f;margin:8px 4px 0 0}
+button.secondary{background:#2b3c5c;color:var(--white)}
+button:disabled{opacity:.5;cursor:wait}
+#status{color:#ffe19a;min-height:24px;line-height:1.6}
+#preview{max-width:100%;max-height:260px;border-radius:12px;margin-top:12px;display:none}
+.small{font-size:13px;color:var(--muted);line-height:1.7}
+.pill{display:inline-block;background:#203b50;color:#9df0d8;padding:5px 10px;border-radius:99px;font-size:12px}
+footer{color:var(--muted);font-size:12px;text-align:center;margin-top:20px}
+</style>
+</head>
+<body>
+<main>
+<header>
+<span class="pill">نسخة تجريبية مجانية</span>
+<h1>QUREO AI</h1>
+<p>مساعد للمذاكرة: استخرج نص السؤال من صورة، ثم انسخه لمراجعته وطلب شرح تعليمي.</p>
+</header>
+
+<section class="card">
+<label for="photo">١) اختار صورة للسؤال</label>
+<input id="photo" type="file" accept="image/*" capture="environment">
+<img id="preview" alt="معاينة الصورة">
+<div><button id="ocrBtn" class="secondary" disabled>استخراج نص السؤال من الصورة</button></div>
+<p id="status" role="status"></p>
+<p class="small">استخراج النص يستخدم مكتبة OCR مجانية عبر الإنترنت؛ قد يخطئ مع الصور غير الواضحة أو الكتابة الصغيرة.</p>
+</section>
+
+<section class="card">
+<label for="question">٢) نص السؤال (تقدر تعدّله)</label>
+<textarea id="question" placeholder="اكتب السؤال هنا أو استخرج النص من صورة..."></textarea>
+<div>
+<button id="copyBtn">نسخ السؤال</button>
+<button id="clearBtn" class="secondary">مسح</button>
+</div>
+</section>
+
+<section class="card">
+<label>٣) اطلب شرحًا تعليميًا</label>
+<p class="hint">انسخ السؤال، ثم افتح ChatGPT والصقه هنا لشرح الفكرة وحل سؤال تدريبي مشابه خطوة بخطوة. التطبيق لا يتصل بحسابك أو بمنصة QUREO ولا يرسل إجابات أو يسلّم أنشطة.</p>
+<button id="chatBtn">فتح ChatGPT</button>
+</section>
+
+<footer>QUREO AI Demo · لا تدخل كلمة مرورك أو بيانات حسابك داخل هذا التطبيق.</footer>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script>
+const photo=document.getElementById('photo'), preview=document.getElementById('preview');
+const ocrBtn=document.getElementById('ocrBtn'), statusEl=document.getElementById('status');
+const question=document.getElementById('question');
+photo.addEventListener('change',()=>{
+ const f=photo.files && photo.files[0];
+ if(!f)return;
+ preview.src=URL.createObjectURL(f); preview.style.display='block';
+ ocrBtn.disabled=false; statusEl.textContent='الصورة جاهزة. اضغط استخراج النص.';
+});
+ocrBtn.addEventListener('click',async()=>{
+ const f=photo.files && photo.files[0]; if(!f)return;
+ ocrBtn.disabled=true; statusEl.textContent='جاري قراءة الصورة... قد يستغرق ذلك بعض الوقت.';
+ try{
+  const result=await Tesseract.recognize(f,'ara+eng',{logger:m=>{
+   if(m.status==='recognizing text') statusEl.textContent='جاري قراءة النص: '+Math.round((m.progress||0)*100)+'%';
+  }});
+  question.value=(result.data.text||'').trim();
+  statusEl.textContent=question.value?'تم استخراج النص. راجعه وصحح أي أخطاء.':'لم أستطع قراءة النص بوضوح؛ جرّب صورة أوضح أو اكتب السؤال.';
+ }catch(e){statusEl.textContent='تعذّر استخراج النص. تأكد من الإنترنت أو اكتب السؤال يدويًا.';}
+ finally{ocrBtn.disabled=false;}
+});
+document.getElementById('copyBtn').addEventListener('click',async()=>{
+ if(!question.value.trim()){statusEl.textContent='اكتب السؤال أولًا.';return;}
+ try{await navigator.clipboard.writeText(question.value);statusEl.textContent='تم نسخ السؤال.';}
+ catch(e){question.select();statusEl.textContent='حدد النص وانسخه يدويًا.';}
+});
+document.getElementById('clearBtn').addEventListener('click',()=>{question.value='';statusEl.textContent='';});
+document.getElementById('chatBtn').addEventListener('click',()=>{
+ const prompt='اشرح لي السؤال التالي تعليميًا، ووضح طريقة التفكير والخطوات دون الاكتفاء بالإجابة فقط:\n\n'+question.value;
+ const url='https://chatgpt.com/?q='+encodeURIComponent(prompt);
+ window.open(url,'_blank','noopener');
+});
+if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
+</script>
+</body>
+</html>
